@@ -3,7 +3,6 @@ package rx.kinesis.producer;
 import com.amazonaws.services.kinesis.AmazonKinesisAsync;
 import com.amazonaws.services.kinesis.model.PutRecordsRequest;
 import com.amazonaws.services.kinesis.model.PutRecordsRequestEntry;
-import com.amazonaws.services.kinesis.model.PutRecordsResult;
 import com.amazonaws.services.kinesis.model.PutRecordsResultEntry;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
@@ -61,13 +60,11 @@ public class KinesisProducer {
                 .withStreamName(configuration.getStreamName())
                 .withRecords(entries);
 
-        Maybe<PutRecordsResult> future = Maybe.fromFuture(kinesis.putRecordsAsync(request));
-
-        return future
-                .subscribeOn(Schedulers.io())
+        return Flowable.fromCallable(() -> kinesis.putRecordsAsync(request))
+                .flatMapMaybe(future -> Maybe.fromFuture(future).subscribeOn(Schedulers.io()))
                 .doOnError(throwable -> records.forEach(record -> record.callback.onError(throwable)))
-                .onErrorComplete()
-                .flatMapPublisher(result -> Flowable.fromIterable(result.getRecords()))
+                .onErrorResumeNext(Flowable.empty())
+                .flatMap(result -> Flowable.fromIterable(result.getRecords()))
                 .zipWith(Flowable.fromIterable(records), KinesisProducer::merge);
     }
 
