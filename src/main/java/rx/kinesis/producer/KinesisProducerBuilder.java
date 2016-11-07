@@ -7,6 +7,7 @@ import com.amazonaws.regions.Regions;
 import com.amazonaws.services.kinesis.AmazonKinesisAsync;
 import com.amazonaws.services.kinesis.AmazonKinesisAsyncClient;
 import rx.kinesis.producer.buffering.BufferingPolicy;
+import rx.kinesis.producer.buffering.NoBufferingPolicy;
 import rx.kinesis.producer.buffering.TimedBufferingPolicy;
 import rx.kinesis.producer.metrics.KinesisMetrics;
 import rx.kinesis.producer.metrics.MetricsReporter;
@@ -48,6 +49,14 @@ public class KinesisProducerBuilder {
 
     public KinesisProducerBuilder withRegion(String region) {
         return new KinesisProducerBuilder(streamName, region, credentialsProvider, bufferingPolicy);
+    }
+
+    public KinesisProducerBuilder withBuffering(long timespan, TimeUnit timeUnit, int maxSize) {
+        return new KinesisProducerBuilder(streamName, region, credentialsProvider, new TimedBufferingPolicy(timespan, timeUnit, maxSize));
+    }
+
+    public KinesisProducerBuilder withoutBuffering() {
+        return new KinesisProducerBuilder(streamName, region, credentialsProvider, new NoBufferingPolicy());
     }
 
     public KinesisProducer build() {
