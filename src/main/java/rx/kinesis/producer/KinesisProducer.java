@@ -108,10 +108,12 @@ public class KinesisProducer {
     }
 
     public Single<KinesisRecordResult> send(KinesisRecord record) {
-        return Single.create(subscriber -> {
+        Single<KinesisRecordResult> result = Single.create(subscriber -> {
             RecordInTransit transitRecord = new RecordInTransit(record, subscriber);
             buffer.onNext(transitRecord);
         });
+
+        return result.compose(source -> configuration.getRetryPolicy().attach(source));
     }
 
     private static class RecordInTransit {

@@ -11,6 +11,8 @@ import rx.kinesis.producer.buffering.NoBufferingPolicy;
 import rx.kinesis.producer.buffering.TimedBufferingPolicy;
 import rx.kinesis.producer.metrics.KinesisMetrics;
 import rx.kinesis.producer.metrics.MetricsReporter;
+import rx.kinesis.producer.retry.NoRetryPolicy;
+import rx.kinesis.producer.retry.RetryPolicy;
 
 import java.util.concurrent.TimeUnit;
 
@@ -24,11 +26,14 @@ public class KinesisProducerBuilder {
 
     private final BufferingPolicy bufferingPolicy;
 
-    public KinesisProducerBuilder(String streamName, String region, AWSCredentialsProvider credentialsProvider, BufferingPolicy bufferingPolicy) {
+    private final RetryPolicy retryPolicy;
+
+    public KinesisProducerBuilder(String streamName, String region, AWSCredentialsProvider credentialsProvider, BufferingPolicy bufferingPolicy, RetryPolicy retryPolicy) {
         this.streamName = streamName;
         this.region = region;
         this.credentialsProvider = credentialsProvider;
         this.bufferingPolicy = bufferingPolicy;
+        this.retryPolicy = retryPolicy;
     }
 
     public static KinesisProducerBuilder builder() {
@@ -36,7 +41,8 @@ public class KinesisProducerBuilder {
                 null,
                 "eu-west-1",
                 new DefaultAWSCredentialsProviderChain(),
-                new TimedBufferingPolicy(500, TimeUnit.MILLISECONDS, 500));
+                new TimedBufferingPolicy(500, TimeUnit.MILLISECONDS, 500),
+                new NoRetryPolicy());
     }
 
     public static KinesisProducerBuilder onStream(String streamName) {
@@ -44,19 +50,23 @@ public class KinesisProducerBuilder {
     }
 
     public KinesisProducerBuilder withStream(String streamName) {
-        return new KinesisProducerBuilder(streamName, region, credentialsProvider, bufferingPolicy);
+        return new KinesisProducerBuilder(streamName, region, credentialsProvider, bufferingPolicy, retryPolicy);
     }
 
     public KinesisProducerBuilder withRegion(String region) {
-        return new KinesisProducerBuilder(streamName, region, credentialsProvider, bufferingPolicy);
+        return new KinesisProducerBuilder(streamName, region, credentialsProvider, bufferingPolicy, retryPolicy);
     }
 
     public KinesisProducerBuilder withBuffering(long timespan, TimeUnit timeUnit, int maxSize) {
-        return new KinesisProducerBuilder(streamName, region, credentialsProvider, new TimedBufferingPolicy(timespan, timeUnit, maxSize));
+        return new KinesisProducerBuilder(streamName, region, credentialsProvider, new TimedBufferingPolicy(timespan, timeUnit, maxSize), retryPolicy);
     }
 
     public KinesisProducerBuilder withoutBuffering() {
-        return new KinesisProducerBuilder(streamName, region, credentialsProvider, new NoBufferingPolicy());
+        return new KinesisProducerBuilder(streamName, region, credentialsProvider, new NoBufferingPolicy(), retryPolicy);
+    }
+
+    public KinesisProducerBuilder withRetryPolicy(RetryPolicy retryPolicy) {
+        return new KinesisProducerBuilder(streamName, region, credentialsProvider, bufferingPolicy, retryPolicy);
     }
 
     public KinesisProducer build() {
@@ -76,7 +86,7 @@ public class KinesisProducerBuilder {
         kinesis.setRegion(Region.getRegion(Regions.fromName(region)));
 
         KinesisMetrics metrics = new KinesisMetrics(new MetricsReporter());
-        KinesisProducerConfiguration configuration = new KinesisProducerConfiguration(bufferingPolicy, streamName);
+        KinesisProducerConfiguration configuration = new KinesisProducerConfiguration(streamName, bufferingPolicy, retryPolicy);
 
         return new KinesisProducer(configuration, kinesis, metrics);
     }
