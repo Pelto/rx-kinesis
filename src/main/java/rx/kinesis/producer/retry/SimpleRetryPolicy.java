@@ -2,7 +2,7 @@ package rx.kinesis.producer.retry;
 
 import io.reactivex.Single;
 
-public class SimpleRetryPolicy extends RetryPolicy {
+public class SimpleRetryPolicy implements RetryPolicy {
 
     private final int retries;
 

@@ -6,7 +6,7 @@ import io.reactivex.Single;
 
 import java.util.concurrent.TimeUnit;
 
-public class TimedRetryPolicy extends RetryPolicy {
+public class TimedRetryPolicy implements RetryPolicy {
 
     private final long retryDelay;
 
