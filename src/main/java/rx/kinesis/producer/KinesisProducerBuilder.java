@@ -11,8 +11,11 @@ import rx.kinesis.producer.buffering.NoBufferingPolicy;
 import rx.kinesis.producer.buffering.TimedBufferingPolicy;
 import rx.kinesis.producer.metrics.KinesisMetrics;
 import rx.kinesis.producer.metrics.MetricsReporter;
+import rx.kinesis.producer.retry.ExponentialTimedRetry;
 import rx.kinesis.producer.retry.NoRetryPolicy;
 import rx.kinesis.producer.retry.RetryPolicy;
+import rx.kinesis.producer.retry.SimpleRetryPolicy;
+import rx.kinesis.producer.retry.TimedRetryPolicy;
 
 import java.util.concurrent.TimeUnit;
 
@@ -67,6 +70,18 @@ public class KinesisProducerBuilder {
 
     public KinesisProducerBuilder withRetryPolicy(RetryPolicy retryPolicy) {
         return new KinesisProducerBuilder(streamName, region, credentialsProvider, bufferingPolicy, retryPolicy);
+    }
+
+    public KinesisProducerBuilder withSimpleRetry(int retries) {
+        return withRetryPolicy(new SimpleRetryPolicy(retries));
+    }
+
+    public KinesisProducerBuilder withTimedRetries(int maxRetries, long timeDelay, TimeUnit timeUnit) {
+        return withRetryPolicy(new TimedRetryPolicy(maxRetries, timeDelay, timeUnit));
+    }
+
+    public KinesisProducerBuilder withExponentialTimedRetry(int maxRetries, long initialTimeDelay, TimeUnit timeUnit) {
+        return withRetryPolicy(new ExponentialTimedRetry(maxRetries, initialTimeDelay, timeUnit));
     }
 
     public KinesisProducer build() {

@@ -5,7 +5,6 @@ import com.amazonaws.services.kinesis.model.PutRecordsRequest;
 import com.amazonaws.services.kinesis.model.PutRecordsRequestEntry;
 import com.amazonaws.services.kinesis.model.PutRecordsResultEntry;
 import io.reactivex.Flowable;
-import io.reactivex.Maybe;
 import io.reactivex.Single;
 import io.reactivex.SingleEmitter;
 import io.reactivex.disposables.Disposable;
@@ -60,27 +59,27 @@ public class KinesisProducer {
                 .withStreamName(configuration.getStreamName())
                 .withRecords(entries);
 
-        return Flowable.fromCallable(() -> kinesis.putRecordsAsync(request))
-                .flatMapMaybe(future -> Maybe.fromFuture(future).subscribeOn(Schedulers.io()))
+        return Single.fromCallable(() -> kinesis.putRecordsAsync(request))
+                .flatMap(future -> Single.fromFuture(future).subscribeOn(Schedulers.io()))
+                .compose(source -> configuration.getRetryPolicy().attach(source))
                 .doOnError(throwable -> records.forEach(record -> record.callback.onError(throwable)))
-                .onErrorResumeNext(Flowable.empty())
-                .flatMap(result -> Flowable.fromIterable(result.getRecords()))
-                .zipWith(Flowable.fromIterable(records), KinesisProducer::merge);
-    }
-
-    private static CompletedRecord merge(PutRecordsResultEntry result,  BufferedRecord transit) {
-        return new CompletedRecord(transit.callback, result, transit.record);
+                .toMaybe()
+                .onErrorComplete()
+                .flatMapPublisher(result -> Flowable.fromIterable(result.getRecords()))
+                .zipWith(Flowable.fromIterable(records), CompletedRecord::new);
     }
 
     private void acknowledge(CompletedRecord completedRecord) {
 
-        if (completedRecord.resultEntry.getErrorCode() != null && !completedRecord.resultEntry.getErrorCode().isEmpty()) {
+        if (recordFailed(completedRecord)) {
             completedRecord.callback.onError(new KinesisProducerException(
                     completedRecord.resultEntry.getErrorMessage(),
                     completedRecord.resultEntry.getErrorCode(),
                     configuration.getStreamName()));
 
-            log.info("Failed to send {}, {}", completedRecord.resultEntry.getErrorCode(), completedRecord.resultEntry.getErrorMessage());
+            log.info("Failed to send {}, {}",
+                     completedRecord.resultEntry.getErrorCode(),
+                     completedRecord.resultEntry.getErrorMessage());
 
             RecordFailed recordFailed = new RecordFailed(
                     completedRecord.resultEntry.getShardId(),
@@ -104,13 +103,17 @@ public class KinesisProducer {
         completedRecord.callback.onSuccess(result);
     }
 
+    private static boolean recordFailed(CompletedRecord record) {
+        return record.resultEntry.getErrorCode() != null && ! record.resultEntry.getErrorCode().isEmpty();
+    }
+
     public Single<KinesisRecordResult> send(KinesisRecord record) {
-        Single<KinesisRecordResult> result = Single.create(subscriber -> {
+        Single<KinesisRecordResult> single = Single.create(subscriber -> {
             BufferedRecord transitRecord = new BufferedRecord(record, subscriber);
             buffer.onNext(transitRecord);
         });
 
-        return result.compose(source -> configuration.getRetryPolicy().attach(source));
+        return single;
     }
 
     private static class BufferedRecord {
@@ -133,10 +136,10 @@ public class KinesisProducer {
 
         private final KinesisRecord record;
 
-        private CompletedRecord(SingleEmitter<KinesisRecordResult> callback, PutRecordsResultEntry resultEntry, KinesisRecord record) {
-            this.callback = callback;
-            this.resultEntry = resultEntry;
-            this.record = record;
+        private CompletedRecord(PutRecordsResultEntry result,  BufferedRecord transit) {
+            this.callback = transit.callback;
+            this.resultEntry = result;
+            this.record = transit.record;
         }
     }
 

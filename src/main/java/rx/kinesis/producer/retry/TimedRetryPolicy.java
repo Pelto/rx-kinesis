@@ -14,7 +14,7 @@ public class TimedRetryPolicy implements RetryPolicy {
 
     private final int maxRetries;
 
-    public TimedRetryPolicy(long retryDelay, TimeUnit retryDelayTimeUnit, int maxRetries) {
+    public TimedRetryPolicy(int maxRetries, long retryDelay, TimeUnit retryDelayTimeUnit) {
         this.retryDelay = retryDelay;
         this.retryDelayTimeUnit = retryDelayTimeUnit;
         this.maxRetries = maxRetries;
