@@ -31,7 +31,7 @@ public class KinesisProducer {
 
     private final KinesisMetrics metrics;
 
-    private final PublishProcessor<RecordInTransit> buffer = PublishProcessor.create();
+    private final PublishProcessor<BufferedRecord> buffer = PublishProcessor.create();
 
     private final Disposable subscription;
 
@@ -48,7 +48,7 @@ public class KinesisProducer {
                 .subscribe(this::acknowledge);
     }
 
-    private Flowable<CompletedRecord> sendRecords(List<RecordInTransit> records) {
+    private Flowable<CompletedRecord> sendRecords(List<BufferedRecord> records) {
 
         List<PutRecordsRequestEntry> entries = records.stream()
                 .map(transit -> new PutRecordsRequestEntry()
@@ -68,7 +68,7 @@ public class KinesisProducer {
                 .zipWith(Flowable.fromIterable(records), KinesisProducer::merge);
     }
 
-    private static CompletedRecord merge(PutRecordsResultEntry result,  RecordInTransit transit) {
+    private static CompletedRecord merge(PutRecordsResultEntry result,  BufferedRecord transit) {
         return new CompletedRecord(transit.callback, result, transit.record);
     }
 
@@ -106,20 +106,20 @@ public class KinesisProducer {
 
     public Single<KinesisRecordResult> send(KinesisRecord record) {
         Single<KinesisRecordResult> result = Single.create(subscriber -> {
-            RecordInTransit transitRecord = new RecordInTransit(record, subscriber);
+            BufferedRecord transitRecord = new BufferedRecord(record, subscriber);
             buffer.onNext(transitRecord);
         });
 
         return result.compose(source -> configuration.getRetryPolicy().attach(source));
     }
 
-    private static class RecordInTransit {
+    private static class BufferedRecord {
 
         private final KinesisRecord record;
 
         private final SingleEmitter<KinesisRecordResult> callback;
 
-        private RecordInTransit(KinesisRecord record, SingleEmitter<KinesisRecordResult> returnSubject) {
+        private BufferedRecord(KinesisRecord record, SingleEmitter<KinesisRecordResult> returnSubject) {
             this.record = record;
             this.callback = returnSubject;
         }
