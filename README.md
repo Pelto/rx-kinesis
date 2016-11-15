@@ -7,10 +7,12 @@ This is a small producer library to Kinesis written in Java using RxJava 2.0
 Start with setting up your producer:
 
 ```java
-KinesisProducer producer = KinesisProducerBuilder
-            .onStream("Name of stream")
-            .withRegion("eu-west-1")
-            .build();
+KinesisProducer producer = KinesisProducerBuilder.onStream("my-kinesis-stream")
+        .withRegion("eu-west-1")
+        .withBuffering(100, TimeUnit.MILLISECONDS, 100)
+        .withKinesisRetryPolicy(new ExponentialTimedRetry(3, 1, TimeUnit.SECONDS))
+        .withRecordRetryPolicy(new TimedRetryPolicy(3, 1, TimeUnit.SECONDS))
+        .build();
 ```
 
 Once your producer has been created you can start sending records:
