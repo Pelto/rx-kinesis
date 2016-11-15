@@ -30,7 +30,7 @@ single.subscribe(new SingleObserver<KinesisRecordResult>() {
         }
 
         @Override
-        public void onSuccess(KinesisRecordResult value) {
+        public void onSuccess(KinesisRecordResult result) {
             log.info("Sent record with sequence number {} to shard {}", result.getSequenceNumber(), result.getShardId());
         }
 
