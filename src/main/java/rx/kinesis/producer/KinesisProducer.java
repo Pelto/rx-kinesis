@@ -61,7 +61,7 @@ public class KinesisProducer {
 
         return Single.fromCallable(() -> kinesis.putRecordsAsync(request))
                 .flatMap(future -> Single.fromFuture(future).subscribeOn(Schedulers.io()))
-                .compose(source -> configuration.getRetryPolicy().attach(source))
+                .compose(source -> configuration.getKinesisRetryPolicy().attach(source))
                 .doOnError(throwable -> records.forEach(record -> record.callback.onError(throwable)))
                 .toMaybe()
                 .onErrorComplete()
@@ -113,7 +113,7 @@ public class KinesisProducer {
             buffer.onNext(transitRecord);
         });
 
-        return single;
+        return single.compose(source -> configuration.getRecordRetryPolicy().attach(source));
     }
 
     private static class BufferedRecord {

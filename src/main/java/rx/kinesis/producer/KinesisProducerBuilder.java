@@ -11,11 +11,8 @@ import rx.kinesis.producer.buffering.NoBufferingPolicy;
 import rx.kinesis.producer.buffering.TimedBufferingPolicy;
 import rx.kinesis.producer.metrics.KinesisMetrics;
 import rx.kinesis.producer.metrics.MetricsReporter;
-import rx.kinesis.producer.retry.ExponentialTimedRetry;
 import rx.kinesis.producer.retry.NoRetryPolicy;
 import rx.kinesis.producer.retry.RetryPolicy;
-import rx.kinesis.producer.retry.SimpleRetryPolicy;
-import rx.kinesis.producer.retry.TimedRetryPolicy;
 
 import java.util.concurrent.TimeUnit;
 
@@ -29,14 +26,17 @@ public class KinesisProducerBuilder {
 
     private final BufferingPolicy bufferingPolicy;
 
-    private final RetryPolicy retryPolicy;
+    private final RetryPolicy kinesisRetryPolicy;
 
-    public KinesisProducerBuilder(String streamName, String region, AWSCredentialsProvider credentialsProvider, BufferingPolicy bufferingPolicy, RetryPolicy retryPolicy) {
+    private final RetryPolicy recordRetryPolicy;
+
+    public KinesisProducerBuilder(String streamName, String region, AWSCredentialsProvider credentialsProvider, BufferingPolicy bufferingPolicy, RetryPolicy kinesisRetryPolicy, RetryPolicy recordRetryPolicy) {
         this.streamName = streamName;
         this.region = region;
         this.credentialsProvider = credentialsProvider;
         this.bufferingPolicy = bufferingPolicy;
-        this.retryPolicy = retryPolicy;
+        this.kinesisRetryPolicy = kinesisRetryPolicy;
+        this.recordRetryPolicy = recordRetryPolicy;
     }
 
     public static KinesisProducerBuilder builder() {
@@ -45,6 +45,7 @@ public class KinesisProducerBuilder {
                 "eu-west-1",
                 new DefaultAWSCredentialsProviderChain(),
                 new TimedBufferingPolicy(500, TimeUnit.MILLISECONDS, 500),
+                new NoRetryPolicy(),
                 new NoRetryPolicy());
     }
 
@@ -53,35 +54,27 @@ public class KinesisProducerBuilder {
     }
 
     public KinesisProducerBuilder withStream(String streamName) {
-        return new KinesisProducerBuilder(streamName, region, credentialsProvider, bufferingPolicy, retryPolicy);
+        return new KinesisProducerBuilder(streamName, region, credentialsProvider, bufferingPolicy, kinesisRetryPolicy, recordRetryPolicy);
     }
 
     public KinesisProducerBuilder withRegion(String region) {
-        return new KinesisProducerBuilder(streamName, region, credentialsProvider, bufferingPolicy, retryPolicy);
+        return new KinesisProducerBuilder(streamName, region, credentialsProvider, bufferingPolicy, kinesisRetryPolicy, recordRetryPolicy);
     }
 
     public KinesisProducerBuilder withBuffering(long timespan, TimeUnit timeUnit, int maxSize) {
-        return new KinesisProducerBuilder(streamName, region, credentialsProvider, new TimedBufferingPolicy(timespan, timeUnit, maxSize), retryPolicy);
+        return new KinesisProducerBuilder(streamName, region, credentialsProvider, new TimedBufferingPolicy(timespan, timeUnit, maxSize), kinesisRetryPolicy, recordRetryPolicy);
     }
 
     public KinesisProducerBuilder withoutBuffering() {
-        return new KinesisProducerBuilder(streamName, region, credentialsProvider, new NoBufferingPolicy(), retryPolicy);
+        return new KinesisProducerBuilder(streamName, region, credentialsProvider, new NoBufferingPolicy(), kinesisRetryPolicy, recordRetryPolicy);
     }
 
-    public KinesisProducerBuilder withRetryPolicy(RetryPolicy retryPolicy) {
-        return new KinesisProducerBuilder(streamName, region, credentialsProvider, bufferingPolicy, retryPolicy);
+    public KinesisProducerBuilder withKinesisRetryPolicy(RetryPolicy kinesisRetryPolicy) {
+        return new KinesisProducerBuilder(streamName, region, credentialsProvider, bufferingPolicy, kinesisRetryPolicy, recordRetryPolicy);
     }
 
-    public KinesisProducerBuilder withSimpleRetry(int retries) {
-        return withRetryPolicy(new SimpleRetryPolicy(retries));
-    }
-
-    public KinesisProducerBuilder withTimedRetries(int maxRetries, long timeDelay, TimeUnit timeUnit) {
-        return withRetryPolicy(new TimedRetryPolicy(maxRetries, timeDelay, timeUnit));
-    }
-
-    public KinesisProducerBuilder withExponentialTimedRetry(int maxRetries, long initialTimeDelay, TimeUnit timeUnit) {
-        return withRetryPolicy(new ExponentialTimedRetry(maxRetries, initialTimeDelay, timeUnit));
+    public KinesisProducerBuilder withRecordRetryPolicy(RetryPolicy recordRetryPolicy) {
+        return new KinesisProducerBuilder(streamName, region, credentialsProvider, bufferingPolicy, kinesisRetryPolicy, recordRetryPolicy);
     }
 
     public KinesisProducer build() {
@@ -101,7 +94,11 @@ public class KinesisProducerBuilder {
         kinesis.setRegion(Region.getRegion(Regions.fromName(region)));
 
         KinesisMetrics metrics = new KinesisMetrics(new MetricsReporter());
-        KinesisProducerConfiguration configuration = new KinesisProducerConfiguration(streamName, bufferingPolicy, retryPolicy);
+        KinesisProducerConfiguration configuration = new KinesisProducerConfiguration(
+                streamName,
+                bufferingPolicy,
+                kinesisRetryPolicy,
+                recordRetryPolicy);
 
         return new KinesisProducer(configuration, kinesis, metrics);
     }

@@ -9,13 +9,18 @@ public class KinesisProducerConfiguration {
 
     private final BufferingPolicy bufferingPolicy;
 
-    private final RetryPolicy retryPolicy;
+    private final RetryPolicy kinesisRetryPolicy;
 
+    private final RetryPolicy recordRetryPolicy;
 
-    public KinesisProducerConfiguration(String streamName, BufferingPolicy bufferingPolicy, RetryPolicy retryPolicy) {
+    public KinesisProducerConfiguration(String streamName,
+                                        BufferingPolicy bufferingPolicy,
+                                        RetryPolicy kinesisRetryPolicy,
+                                        RetryPolicy recordRetryPolicy) {
         this.bufferingPolicy = bufferingPolicy;
         this.streamName = streamName;
-        this.retryPolicy = retryPolicy;
+        this.kinesisRetryPolicy = kinesisRetryPolicy;
+        this.recordRetryPolicy = recordRetryPolicy;
     }
 
     public String getStreamName() {
@@ -26,7 +31,11 @@ public class KinesisProducerConfiguration {
         return bufferingPolicy;
     }
 
-    public RetryPolicy getRetryPolicy() {
-        return retryPolicy;
+    public RetryPolicy getKinesisRetryPolicy() {
+        return kinesisRetryPolicy;
+    }
+
+    public RetryPolicy getRecordRetryPolicy() {
+        return recordRetryPolicy;
     }
 }
